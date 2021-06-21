@@ -1,7 +1,7 @@
-// Copyright (c) 2018-Present Pivotal Software, Inc.  All rights reserved.
+// Copyright (c) 2018-2020 VMware, Inc. or its affiliates.  All rights reserved.
 //
 // This software, the RabbitMQ Java client library, is triple-licensed under the
-// Mozilla Public License 1.1 ("MPL"), the GNU General Public License version 2
+// Mozilla Public License 2.0 ("MPL"), the GNU General Public License version 2
 // ("GPL") and the Apache License version 2 ("ASL"). For the MPL, please see
 // LICENSE-MPL-RabbitMQ. For the GPL, please see LICENSE-GPL2.  For the ASL,
 // please see LICENSE-APACHE2.
@@ -29,6 +29,7 @@ import com.rabbitmq.client.impl.recovery.AutorecoveringChannel;
 import com.rabbitmq.client.impl.recovery.AutorecoveringConnection;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.ClassRule;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -41,9 +42,9 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import org.junit.rules.TestRule;
 
-import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Test to trigger and check the fix of rabbitmq/rabbitmq-java-client#341,
@@ -66,6 +67,9 @@ import static org.junit.Assert.assertThat;
  * </p>
  */
 public class NoAutoRecoveryWhenTcpWindowIsFullTest {
+
+    @ClassRule
+    public static TestRule brokerOnDockerTestRule = TestUtils.brokerIsNotRunningOnDocker();
 
     private static final int NUM_MESSAGES_TO_PRODUCE = 50000;
     private static final int MESSAGE_PROCESSING_TIME_MS = 3000;
@@ -149,15 +153,13 @@ public class NoAutoRecoveryWhenTcpWindowIsFullTest {
         produceMessagesInBackground(producingChannel, queue);
         startConsumer(queue);
 
-        assertThat(
-            "Connection should have been closed and should have recovered by now",
-            recoveryLatch.await(60, TimeUnit.SECONDS), is(true)
-        );
+        assertThat(recoveryLatch.await(60, TimeUnit.SECONDS))
+                .as("Connection should have been closed and should have recovered by now")
+                .isTrue();
 
-        assertThat(
-            "Consumer should have recovered by now",
-            consumerOkLatch.await(5, TimeUnit.SECONDS), is(true)
-        );
+        assertThat(consumerOkLatch.await(5, TimeUnit.SECONDS))
+                .as("Consumer should have recovered by now")
+                .isTrue();
     }
 
     private void closeConnectionIfOpen(Connection connection) throws IOException {
@@ -173,16 +175,12 @@ public class NoAutoRecoveryWhenTcpWindowIsFullTest {
 
     private void produceMessagesInBackground(final Channel channel, final String queue) throws IOException {
         final AMQP.BasicProperties properties = new AMQP.BasicProperties.Builder().deliveryMode(1).build();
-        executorService.submit(new Callable<Void>() {
-
-            @Override
-            public Void call() throws Exception {
-                for (int i = 0; i < NUM_MESSAGES_TO_PRODUCE; i++) {
-                    channel.basicPublish("", queue, false, properties, MESSAGE_CONTENT);
-                }
-                closeConnectionIfOpen(producingConnection);
-                return null;
+        executorService.submit((Callable<Void>) () -> {
+            for (int i = 0; i < NUM_MESSAGES_TO_PRODUCE; i++) {
+                channel.basicPublish("", queue, false, properties, MESSAGE_CONTENT);
             }
+            closeConnectionIfOpen(producingConnection);
+            return null;
         });
     }
 

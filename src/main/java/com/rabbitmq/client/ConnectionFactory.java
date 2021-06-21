@@ -1,7 +1,7 @@
-// Copyright (c) 2007-Present Pivotal Software, Inc.  All rights reserved.
+// Copyright (c) 2007-2020 VMware, Inc. or its affiliates.  All rights reserved.
 //
 // This software, the RabbitMQ Java client library, is triple-licensed under the
-// Mozilla Public License 1.1 ("MPL"), the GNU General Public License version 2
+// Mozilla Public License 2.0 ("MPL"), the GNU General Public License version 2
 // ("GPL") and the Apache License version 2 ("ASL"). For the MPL, please see
 // LICENSE-MPL-RabbitMQ. For the GPL, please see LICENSE-GPL2.  For the ASL,
 // please see LICENSE-APACHE2.
@@ -22,6 +22,8 @@ import com.rabbitmq.client.impl.recovery.AutorecoveringConnection;
 import com.rabbitmq.client.impl.recovery.RetryHandler;
 import com.rabbitmq.client.impl.recovery.TopologyRecoveryFilter;
 
+import java.util.Map.Entry;
+import java.util.function.BiConsumer;
 import javax.net.SocketFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSocketFactory;
@@ -46,6 +48,8 @@ import static java.util.concurrent.TimeUnit.MINUTES;
  * and will apply to all connections produced by this factory.
  */
 public class ConnectionFactory implements Cloneable {
+
+    private static final int MAX_UNSIGNED_SHORT = 65535;
 
     /** Default user name */
     public static final String DEFAULT_USER = "guest";
@@ -346,6 +350,11 @@ public class ConnectionFactory implements Cloneable {
 
             setVirtualHost(uriDecode(uri.getPath().substring(1)));
         }
+        
+        String rawQuery = uri.getRawQuery();
+        if (rawQuery != null && rawQuery.length() > 0) {
+            setQuery(rawQuery);
+        }
     }
 
     /**
@@ -375,6 +384,82 @@ public class ConnectionFactory implements Cloneable {
         }
     }
 
+  private static final Map<String, BiConsumer<String, ConnectionFactory>> URI_QUERY_PARAMETER_HANDLERS =
+      new HashMap<String, BiConsumer<String, ConnectionFactory>>() {
+        {
+            put("heartbeat", (value, cf) -> {
+                try {
+                    int heartbeatInt = Integer.parseInt(value);
+                    cf.setRequestedHeartbeat(heartbeatInt);
+                } catch (NumberFormatException e) {
+                    throw new IllegalArgumentException("Requested heartbeat must an integer");
+                }
+            });
+            put("connection_timeout", (value, cf) -> {
+              try {
+                int connectionTimeoutInt = Integer.parseInt(value);
+                cf.setConnectionTimeout(connectionTimeoutInt);
+              } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("TCP connection timeout must an integer");
+              }
+            });
+            put("channel_max", (value, cf) -> {
+                try {
+                    int channelMaxInt = Integer.parseInt(value);
+                    cf.setRequestedChannelMax(channelMaxInt);
+                } catch (NumberFormatException e) {
+                    throw new IllegalArgumentException("Requested channel max must an integer");
+                }
+            });
+        }
+      };
+
+    /**
+     * Convenience method for setting some fields from query parameters
+     * Will handle only a subset of the query parameters supported by the
+     * official erlang client
+     * https://www.rabbitmq.com/uri-query-parameters.html
+     * @param rawQuery is the string containing the raw query parameters part from a URI
+     */
+    private void setQuery(String rawQuery) {
+        Map<String, String> parameters = new HashMap<>();
+        // parsing the query parameters
+        try {
+            for (String param : rawQuery.split("&")) {
+                String[] pair = param.split("=");
+                String key = URLDecoder.decode(pair[0], "US-ASCII");
+                String value = null;
+                if (pair.length > 1) {
+                    value = URLDecoder.decode(pair[1], "US-ASCII");
+                }
+                parameters.put(key, value);
+            }
+        } catch (IOException e) {
+            throw new IllegalArgumentException("Cannot parse the query parameters", e);
+        }
+
+        for (Entry<String, String> entry : parameters.entrySet()) {
+            BiConsumer<String, ConnectionFactory> handler = URI_QUERY_PARAMETER_HANDLERS
+                .get(entry.getKey());
+            if (handler != null) {
+                handler.accept(entry.getValue(), this);
+            } else {
+                processUriQueryParameter(entry.getKey(), entry.getValue());
+            }
+        }
+    }
+
+    /**
+     * Hook to process query parameters not handled natively.
+     * Handled natively: <code>heartbeat</code>, <code>connection_timeout</code>,
+     * <code>channel_max</code>.
+     * @param key
+     * @param value
+     */
+    protected void processUriQueryParameter(String key, String value) {
+
+    }
+
     /**
      * Retrieve the requested maximum channel number
      * @return the initially requested maximum channel number; zero for unlimited
@@ -384,10 +469,16 @@ public class ConnectionFactory implements Cloneable {
     }
 
     /**
-     * Set the requested maximum channel number
+     * Set the requested maximum channel number.
+     * <p>
+     * Note the value must be between 0 and 65535 (unsigned short in AMQP 0-9-1).
+     *
      * @param requestedChannelMax initially requested maximum channel number; zero for unlimited
      */
     public void setRequestedChannelMax(int requestedChannelMax) {
+        if (requestedChannelMax < 0 || requestedChannelMax > MAX_UNSIGNED_SHORT) {
+            throw new IllegalArgumentException("Requested channel max must be between 0 and " + MAX_UNSIGNED_SHORT);
+        }
         this.requestedChannelMax = requestedChannelMax;
     }
 
@@ -477,10 +568,16 @@ public class ConnectionFactory implements Cloneable {
      * Set the requested heartbeat timeout. Heartbeat frames will be sent at about 1/2 the timeout interval.
      * If server heartbeat timeout is configured to a non-zero value, this method can only be used
      * to lower the value; otherwise any value provided by the client will be used.
+     * <p>
+     * Note the value must be between 0 and 65535 (unsigned short in AMQP 0-9-1).
+     *
      * @param requestedHeartbeat the initially requested heartbeat timeout, in seconds; zero for none
      * @see <a href="https://rabbitmq.com/heartbeats.html">RabbitMQ Heartbeats Guide</a>
      */
     public void setRequestedHeartbeat(int requestedHeartbeat) {
+        if (requestedHeartbeat < 0 || requestedHeartbeat > MAX_UNSIGNED_SHORT) {
+            throw new IllegalArgumentException("Requested heartbeat must be between 0 and " + MAX_UNSIGNED_SHORT);
+        }
         this.requestedHeartbeat = requestedHeartbeat;
     }
 

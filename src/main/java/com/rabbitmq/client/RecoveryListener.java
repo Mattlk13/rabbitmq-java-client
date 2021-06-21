@@ -1,7 +1,7 @@
-// Copyright (c) 2007-Present Pivotal Software, Inc.  All rights reserved.
+// Copyright (c) 2007-2020 VMware, Inc. or its affiliates.  All rights reserved.
 //
 // This software, the RabbitMQ Java client library, is triple-licensed under the
-// Mozilla Public License 1.1 ("MPL"), the GNU General Public License version 2
+// Mozilla Public License 2.0 ("MPL"), the GNU General Public License version 2
 // ("GPL") and the Apache License version 2 ("ASL"). For the MPL, please see
 // LICENSE-MPL-RabbitMQ. For the GPL, please see LICENSE-GPL2.  For the ASL,
 // please see LICENSE-APACHE2.
@@ -36,4 +36,12 @@ public interface RecoveryListener {
      * @param recoverable a {@link Recoverable} connection.
      */
     void handleRecoveryStarted(Recoverable recoverable);
+    
+    /**
+     * Invoked before automatic topology recovery starts.
+     * This means that the connection and channel recovery has completed 
+     * and that exchange/queue/binding/consumer recovery is about to begin.
+     * @param recoverable a {@link Recoverable} connection.
+     */
+    default void handleTopologyRecoveryStarted(Recoverable recoverable) {}
 }

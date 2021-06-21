@@ -1,7 +1,7 @@
-// Copyright (c) 2018 Pivotal Software, Inc.  All rights reserved.
+// Copyright (c) 2018-2020 VMware, Inc. or its affiliates.  All rights reserved.
 //
 // This software, the RabbitMQ Java client library, is triple-licensed under the
-// Mozilla Public License 1.1 ("MPL"), the GNU General Public License version 2
+// Mozilla Public License 2.0 ("MPL"), the GNU General Public License version 2
 // ("GPL") and the Apache License version 2 ("ASL"). For the MPL, please see
 // LICENSE-MPL-RabbitMQ. For the GPL, please see LICENSE-GPL2.  For the ASL,
 // please see LICENSE-APACHE2.
@@ -17,6 +17,7 @@ package com.rabbitmq.client.test;
 
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -31,7 +32,7 @@ import java.util.Optional;
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-import static org.mockito.MockitoAnnotations.initMocks;
+import static org.mockito.MockitoAnnotations.openMocks;
 
 @RunWith(Parameterized.class)
 public class ConnectionTest {
@@ -43,6 +44,8 @@ public class ConnectionTest {
     @Mock
     Channel ch = mock(Channel.class);
 
+    AutoCloseable mocks;
+
     @Parameterized.Parameters
     public static Object[] configurators() {
         return new Object[]{new NotNumberedChannelCreationCallback(), new NumberedChannelCreationCallback()};
@@ -50,7 +53,12 @@ public class ConnectionTest {
 
     @Before
     public void init() {
-        initMocks(this);
+        mocks = openMocks(this);
+    }
+
+    @After
+    public void tearDown() throws Exception {
+        mocks.close();
     }
 
     @Test

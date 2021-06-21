@@ -1,7 +1,7 @@
-// Copyright (c) 2007-2020 Pivotal Software, Inc.  All rights reserved.
+// Copyright (c) 2007-2020 VMware, Inc. or its affiliates.  All rights reserved.
 //
 // This software, the RabbitMQ Java client library, is triple-licensed under the
-// Mozilla Public License 1.1 ("MPL"), the GNU General Public License version 2
+// Mozilla Public License 2.0 ("MPL"), the GNU General Public License version 2
 // ("GPL") and the Apache License version 2 ("ASL"). For the MPL, please see
 // LICENSE-MPL-RabbitMQ. For the GPL, please see LICENSE-GPL2.  For the ASL,
 // please see LICENSE-APACHE2.
@@ -19,6 +19,7 @@ import com.rabbitmq.client.*;
 import com.rabbitmq.client.impl.NetworkConnection;
 import com.rabbitmq.client.impl.recovery.AutorecoveringConnection;
 import com.rabbitmq.tools.Host;
+import org.assertj.core.api.Assertions;
 import org.junit.AssumptionViolatedException;
 import org.junit.rules.TestRule;
 import org.junit.runner.Description;
@@ -29,6 +30,7 @@ import javax.net.ssl.SSLContext;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -36,6 +38,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.BooleanSupplier;
 
 import static org.junit.Assert.assertTrue;
 
@@ -51,6 +54,28 @@ public class TestUtils {
             connectionFactory.useBlockingIo();
         }
         return connectionFactory;
+    }
+
+    public static void waitAtMost(Duration timeout, BooleanSupplier condition) {
+        if (condition.getAsBoolean()) {
+            return;
+        }
+        int waitTime = 100;
+        int waitedTime = 0;
+        long timeoutInMs = timeout.toMillis();
+        while (waitedTime <= timeoutInMs) {
+            try {
+                Thread.sleep(waitTime);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException(e);
+            }
+            if (condition.getAsBoolean()) {
+                return;
+            }
+            waitedTime += waitTime;
+        }
+        Assertions.fail("Waited " + timeout.getSeconds() + " second(s), condition never got true");
     }
 
     public static void close(Connection connection) {
@@ -87,6 +112,10 @@ public class TestUtils {
 
     public static TestRule atLeast38() {
         return new BrokerVersionTestRule("3.8.0");
+    }
+
+    public static TestRule brokerIsNotRunningOnDocker() {
+        return new BrokerIsNotOnDocker();
     }
 
     public static boolean isVersion37orLater(Connection connection) {
@@ -286,4 +315,33 @@ public class TestUtils {
             };
         }
     }
+
+    private static class BrokerIsNotOnDocker implements TestRule {
+
+
+        @Override
+        public Statement apply(Statement base, Description description) {
+            return new Statement() {
+                @Override
+                public void evaluate() throws Throwable {
+                    try {
+                        if (Host.isOnDocker()) {
+                            throw new AssumptionViolatedException("Broker is running on Docker");
+                        }
+                    } catch (Exception e) {
+                        throw new AssumptionViolatedException("Could not check whether broker is running on Docker or not", e);
+                    }
+                    base.evaluate();
+                }
+            };
+        }
+    }
+
+    @FunctionalInterface
+    public interface CallableFunction<T, R> {
+
+        R apply(T t) throws Exception;
+
+    }
+
 }

@@ -1,7 +1,7 @@
-// Copyright (c) 2007-2020 Pivotal Software, Inc.  All rights reserved.
+// Copyright (c) 2007-2020 VMware, Inc. or its affiliates.  All rights reserved.
 //
 // This software, the RabbitMQ Java client library, is triple-licensed under the
-// Mozilla Public License 1.1 ("MPL"), the GNU General Public License version 2
+// Mozilla Public License 2.0 ("MPL"), the GNU General Public License version 2
 // ("GPL") and the Apache License version 2 ("ASL"). For the MPL, please see
 // LICENSE-MPL-RabbitMQ. For the GPL, please see LICENSE-GPL2.  For the ASL,
 // please see LICENSE-APACHE2.
@@ -90,7 +90,7 @@ public class RpcClient {
      *
      * @since 5.9.0
      */
-    private final Supplier<String> _correlationIdGenerator;
+    private final Supplier<String> _correlationIdSupplier;
 
     private String lastCorrelationId = "0";
 
@@ -117,7 +117,7 @@ public class RpcClient {
         _timeout = params.getTimeout();
         _useMandatory = params.shouldUseMandatory();
         _replyHandler = params.getReplyHandler();
-        _correlationIdGenerator = params.getCorrelationIdSupplier();
+        _correlationIdSupplier = params.getCorrelationIdSupplier();
 
         _consumer = setupConsumer();
         if (_useMandatory) {
@@ -216,7 +216,7 @@ public class RpcClient {
         BlockingCell<Object> k = new BlockingCell<Object>();
         String replyId;
         synchronized (_continuationMap) {
-            replyId = _correlationIdGenerator.get();
+            replyId = _correlationIdSupplier.get();
             lastCorrelationId = replyId;
             props = ((props==null) ? new AMQP.BasicProperties.Builder() : props.builder())
                 .correlationId(replyId).replyTo(_replyTo).build();

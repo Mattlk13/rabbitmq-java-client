@@ -1,7 +1,7 @@
-// Copyright (c) 2007-Present Pivotal Software, Inc.  All rights reserved.
+// Copyright (c) 2007-2020 VMware, Inc. or its affiliates.  All rights reserved.
 //
 // This software, the RabbitMQ Java client library, is triple-licensed under the
-// Mozilla Public License 1.1 ("MPL"), the GNU General Public License version 2
+// Mozilla Public License 2.0 ("MPL"), the GNU General Public License version 2
 // ("GPL") and the Apache License version 2 ("ASL"). For the MPL, please see
 // LICENSE-MPL-RabbitMQ. For the GPL, please see LICENSE-GPL2.  For the ASL,
 // please see LICENSE-APACHE2.
@@ -193,42 +193,49 @@ public interface Channel extends ShutdownNotifier, AutoCloseable {
 
     /**
      * Request specific "quality of service" settings.
-     *
+     * <p>
      * These settings impose limits on the amount of data the server
      * will deliver to consumers before requiring acknowledgements.
      * Thus they provide a means of consumer-initiated flow control.
-     * @see com.rabbitmq.client.AMQP.Basic.Qos
-     * @param prefetchSize maximum amount of content (measured in
-     * octets) that the server will deliver, 0 if unlimited
+     * <p>
+     * Note the prefetch count must be between 0 and 65535 (unsigned short in AMQP 0-9-1).
+     *
+     * @param prefetchSize  maximum amount of content (measured in
+     *                      octets) that the server will deliver, 0 if unlimited
      * @param prefetchCount maximum number of messages that the server
-     * will deliver, 0 if unlimited
-     * @param global true if the settings should be applied to the
-     * entire channel rather than each consumer
+     *                      will deliver, 0 if unlimited
+     * @param global        true if the settings should be applied to the
+     *                      entire channel rather than each consumer
      * @throws java.io.IOException if an error is encountered
+     * @see com.rabbitmq.client.AMQP.Basic.Qos
      */
     void basicQos(int prefetchSize, int prefetchCount, boolean global) throws IOException;
 
     /**
      * Request a specific prefetchCount "quality of service" settings
      * for this channel.
+     * <p>
+     * Note the prefetch count must be between 0 and 65535 (unsigned short in AMQP 0-9-1).
      *
-     * @see #basicQos(int, int, boolean)
      * @param prefetchCount maximum number of messages that the server
-     * will deliver, 0 if unlimited
-     * @param global true if the settings should be applied to the
-     * entire channel rather than each consumer
+     *                      will deliver, 0 if unlimited
+     * @param global        true if the settings should be applied to the
+     *                      entire channel rather than each consumer
      * @throws java.io.IOException if an error is encountered
+     * @see #basicQos(int, int, boolean)
      */
     void basicQos(int prefetchCount, boolean global) throws IOException;
 
     /**
      * Request a specific prefetchCount "quality of service" settings
      * for this channel.
+     * <p>
+     * Note the prefetch count must be between 0 and 65535 (unsigned short in AMQP 0-9-1).
      *
-     * @see #basicQos(int, int, boolean)
      * @param prefetchCount maximum number of messages that the server
-     * will deliver, 0 if unlimited
+     *                      will deliver, 0 if unlimited
      * @throws java.io.IOException if an error is encountered
+     * @see #basicQos(int, int, boolean)
      */
     void basicQos(int prefetchCount) throws IOException;
 

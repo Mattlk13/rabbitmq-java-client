@@ -1,7 +1,7 @@
-// Copyright (c) 2007-Present Pivotal Software, Inc.  All rights reserved.
+// Copyright (c) 2007-2020 VMware, Inc. or its affiliates.  All rights reserved.
 //
 // This software, the RabbitMQ Java client library, is triple-licensed under the
-// Mozilla Public License 1.1 ("MPL"), the GNU General Public License version 2
+// Mozilla Public License 2.0 ("MPL"), the GNU General Public License version 2
 // ("GPL") and the Apache License version 2 ("ASL"). For the MPL, please see
 // LICENSE-MPL-RabbitMQ. For the GPL, please see LICENSE-GPL2.  For the ASL,
 // please see LICENSE-APACHE2.
@@ -40,9 +40,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static com.rabbitmq.client.test.TestUtils.prepareForRecovery;
-import static org.hamcrest.Matchers.greaterThanOrEqualTo;
-import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.fail;
 
 @SuppressWarnings("ThrowFromFinallyBlock")
 public class ConnectionRecovery extends BrokerTestCase {
@@ -51,30 +50,30 @@ public class ConnectionRecovery extends BrokerTestCase {
     private static final int MANY_DECLARATIONS_LOOP_COUNT = 500;
 
     @Test public void connectionRecovery() throws IOException, InterruptedException {
-        assertTrue(connection.isOpen());
+        assertThat(connection.isOpen()).isTrue();
         closeAndWaitForRecovery();
-        assertTrue(connection.isOpen());
+        assertThat(connection.isOpen()).isTrue();
     }
 
     @Test public void namedConnectionRecovery()
             throws IOException, InterruptedException, TimeoutException  {
-        String connectionName = "custom name";
+        String connectionName = "custom-name";
         RecoverableConnection c = newRecoveringConnection(connectionName);
         try {
-            assertTrue(c.isOpen());
-            assertEquals(connectionName, c.getClientProvidedName());
+            assertThat(c.isOpen()).isTrue();
+            assertThat(connectionName).isEqualTo(c.getClientProvidedName());
             TestUtils.closeAndWaitForRecovery(c);
-            assertTrue(c.isOpen());
-            assertEquals(connectionName, c.getClientProvidedName());
+            assertThat(c.isOpen()).isTrue();
+            assertThat(connectionName).isEqualTo(c.getClientProvidedName());
         } finally {
             c.abort();
         }
     }
 
     @Test public void connectionRecoveryWithServerRestart() throws IOException, InterruptedException {
-        assertTrue(connection.isOpen());
+        assertThat(connection.isOpen()).isTrue();
         restartPrimaryAndWaitForRecovery();
-        assertTrue(connection.isOpen());
+        assertThat(connection.isOpen()).isTrue();
     }
 
     @Test public void connectionRecoveryWithArrayOfAddresses()
@@ -82,9 +81,9 @@ public class ConnectionRecovery extends BrokerTestCase {
         final Address[] addresses = {new Address("127.0.0.1"), new Address("127.0.0.1", 5672)};
         RecoverableConnection c = newRecoveringConnection(addresses);
         try {
-            assertTrue(c.isOpen());
+            assertThat(c.isOpen()).isTrue();
             TestUtils.closeAndWaitForRecovery(c);
-            assertTrue(c.isOpen());
+            assertThat(c.isOpen()).isTrue();
         } finally {
             c.abort();
         }
@@ -98,9 +97,9 @@ public class ConnectionRecovery extends BrokerTestCase {
 
         RecoverableConnection c = newRecoveringConnection(addresses);
         try {
-            assertTrue(c.isOpen());
+            assertThat(c.isOpen()).isTrue();
             TestUtils.closeAndWaitForRecovery(c);
-            assertTrue(c.isOpen());
+            assertThat(c.isOpen()).isTrue();
         } finally {
             c.abort();
         }
@@ -113,14 +112,14 @@ public class ConnectionRecovery extends BrokerTestCase {
         String q = "java-client.test.recovery.q2";
         ch.queueDeclare(q, false, true, false, null);
         ch.queueDeclarePassive(q);
-        assertTrue(c.isOpen());
+        assertThat(c.isOpen()).isTrue();
         try {
             CountDownLatch shutdownLatch = prepareForShutdown(c);
             CountDownLatch recoveryLatch = prepareForRecovery(c);
             Host.closeConnection((NetworkConnection) c);
             wait(shutdownLatch);
             wait(recoveryLatch);
-            assertTrue(c.isOpen());
+            assertThat(c.isOpen()).isTrue();
             ch.queueDeclarePassive(q);
             fail("expected passive declaration to throw");
         } catch (java.io.IOException e) {
@@ -152,17 +151,17 @@ public class ConnectionRecovery extends BrokerTestCase {
                 return password;
             }
         });
-        RecoverableConnection c = (RecoverableConnection) cf.newConnection();
+        RecoverableConnection c = (RecoverableConnection) cf.newConnection(UUID.randomUUID().toString());
         try {
-            assertTrue(c.isOpen());
-            assertThat(usernameRequested.get(), is(1));
-            assertThat(passwordRequested.get(), is(1));
+            assertThat(c.isOpen()).isTrue();
+            assertThat(usernameRequested.get()).isEqualTo(1);
+            assertThat(passwordRequested.get()).isEqualTo(1);
 
             TestUtils.closeAndWaitForRecovery(c);
-            assertTrue(c.isOpen());
+            assertThat(c.isOpen()).isTrue();
             // username is requested in AMQConnection#toString, so it can be accessed at any time
-            assertThat(usernameRequested.get(), greaterThanOrEqualTo(2));
-            assertThat(passwordRequested.get(), is(2));
+            assertThat(usernameRequested.get()).isGreaterThanOrEqualTo(2);
+            assertThat(passwordRequested.get()).isEqualTo(2);
         } finally {
             c.abort();
         }
@@ -171,19 +170,9 @@ public class ConnectionRecovery extends BrokerTestCase {
     // see https://github.com/rabbitmq/rabbitmq-java-client/issues/135
     @Test public void thatShutdownHooksOnConnectionFireBeforeRecoveryStarts() throws IOException, InterruptedException {
         final List<String> events = new CopyOnWriteArrayList<String>();
-        final CountDownLatch latch = new CountDownLatch(2); // one when started, another when complete
-        connection.addShutdownListener(new ShutdownListener() {
-            @Override
-            public void shutdownCompleted(ShutdownSignalException cause) {
-                events.add("shutdown hook 1");
-            }
-        });
-        connection.addShutdownListener(new ShutdownListener() {
-            @Override
-            public void shutdownCompleted(ShutdownSignalException cause) {
-                events.add("shutdown hook 2");
-            }
-        });
+        final CountDownLatch latch = new CountDownLatch(3); // one when started, another when complete
+        connection.addShutdownListener(cause -> events.add("shutdown hook 1"));
+        connection.addShutdownListener(cause -> events.add("shutdown hook 2"));
         // note: we do not want to expose RecoveryCanBeginListener so this
         // test does not use it
         final CountDownLatch recoveryCanBeginLatch = new CountDownLatch(1);
@@ -203,46 +192,40 @@ public class ConnectionRecovery extends BrokerTestCase {
             public void handleRecoveryStarted(Recoverable recoverable) {
                 latch.countDown();
             }
+            @Override
+            public void handleTopologyRecoveryStarted(Recoverable recoverable) {
+                latch.countDown();
+            }
         });
-        assertTrue(connection.isOpen());
+        assertThat(connection.isOpen()).isTrue();
         closeAndWaitForRecovery();
-        assertTrue(connection.isOpen());
-        assertEquals("shutdown hook 1", events.get(0));
-        assertEquals("shutdown hook 2", events.get(1));
+        assertThat(connection.isOpen()).isTrue();
+        assertThat(events).element(0).isEqualTo("shutdown hook 1");
+        assertThat(events).element(1).isEqualTo("shutdown hook 2");
         recoveryCanBeginLatch.await(5, TimeUnit.SECONDS);
-        assertEquals("recovery start hook 1", events.get(2));
+        assertThat(events).element(2).isEqualTo("recovery start hook 1");
         connection.close();
         wait(latch);
     }
 
     @Test public void shutdownHooksRecoveryOnConnection() throws IOException, InterruptedException {
         final CountDownLatch latch = new CountDownLatch(2);
-        connection.addShutdownListener(new ShutdownListener() {
-            @Override
-            public void shutdownCompleted(ShutdownSignalException cause) {
-                latch.countDown();
-            }
-        });
-        assertTrue(connection.isOpen());
+        connection.addShutdownListener(cause -> latch.countDown());
+        assertThat(connection.isOpen()).isTrue();
         closeAndWaitForRecovery();
-        assertTrue(connection.isOpen());
+        assertThat(connection.isOpen()).isTrue();
         connection.close();
         wait(latch);
     }
 
     @Test public void shutdownHooksRecoveryOnChannel() throws IOException, InterruptedException {
         final CountDownLatch latch = new CountDownLatch(3);
-        channel.addShutdownListener(new ShutdownListener() {
-            @Override
-            public void shutdownCompleted(ShutdownSignalException cause) {
-                latch.countDown();
-            }
-        });
-        assertTrue(connection.isOpen());
+        channel.addShutdownListener(cause -> latch.countDown());
+        assertThat(connection.isOpen()).isTrue();
         closeAndWaitForRecovery();
-        assertTrue(connection.isOpen());
+        assertThat(connection.isOpen()).isTrue();
         closeAndWaitForRecovery();
-        assertTrue(connection.isOpen());
+        assertThat(connection.isOpen()).isTrue();
         connection.close();
         wait(latch);
     }
@@ -251,12 +234,12 @@ public class ConnectionRecovery extends BrokerTestCase {
         final CountDownLatch latch = new CountDownLatch(2);
         connection.addBlockedListener(new BlockedListener() {
             @Override
-            public void handleBlocked(String reason) throws IOException {
+            public void handleBlocked(String reason) {
                 latch.countDown();
             }
 
             @Override
-            public void handleUnblocked() throws IOException {
+            public void handleUnblocked() {
                 latch.countDown();
             }
         });
@@ -271,23 +254,33 @@ public class ConnectionRecovery extends BrokerTestCase {
         Channel ch1 = connection.createChannel();
         Channel ch2 = connection.createChannel();
 
-        assertTrue(ch1.isOpen());
-        assertTrue(ch2.isOpen());
+        assertThat(ch1.isOpen()).isTrue();
+        assertThat(ch2.isOpen()).isTrue();
         closeAndWaitForRecovery();
         expectChannelRecovery(ch1);
         expectChannelRecovery(ch2);
     }
 
+    @Test public void channelRecoveryWithUserProvidedChannelIDs() throws IOException, InterruptedException {
+        int n1 = 11;
+        Channel ch1 = connection.createChannel(n1);
+        int n2 = 22;
+        Channel ch2 = connection.createChannel(n2);
+
+        assertThat(ch1.isOpen()).isTrue();
+        assertThat(ch2.isOpen()).isTrue();
+        closeAndWaitForRecovery();
+        expectChannelRecovery(ch1);
+        expectChannelRecovery(ch2);
+
+        assertThat(ch1.getChannelNumber()).isEqualTo(n1);
+        assertThat(ch2.getChannelNumber()).isEqualTo(n2);
+    }
+
     @Test public void returnListenerRecovery() throws IOException, InterruptedException {
         final CountDownLatch latch = new CountDownLatch(1);
-        channel.addReturnListener(new ReturnListener() {
-            @Override
-            public void handleReturn(int replyCode, String replyText, String exchange,
-                                     String routingKey, AMQP.BasicProperties properties,
-                                     byte[] body) throws IOException {
-                latch.countDown();
-            }
-        });
+        channel.addReturnListener(
+            (replyCode, replyText, exchange, routingKey, properties, body) -> latch.countDown());
         closeAndWaitForRecovery();
         expectChannelRecovery(channel);
         channel.basicPublish("", "unknown", true, false, null, "mandatory1".getBytes());
@@ -298,12 +291,12 @@ public class ConnectionRecovery extends BrokerTestCase {
         final CountDownLatch latch = new CountDownLatch(1);
         channel.addConfirmListener(new ConfirmListener() {
             @Override
-            public void handleAck(long deliveryTag, boolean multiple) throws IOException {
+            public void handleAck(long deliveryTag, boolean multiple) {
                 latch.countDown();
             }
 
             @Override
-            public void handleNack(long deliveryTag, boolean multiple) throws IOException {
+            public void handleNack(long deliveryTag, boolean multiple) {
                 latch.countDown();
             }
         });
@@ -391,7 +384,7 @@ public class ConnectionRecovery extends BrokerTestCase {
         ch.basicPublish(x, "", null, "msg".getBytes());
         waitForConfirms(ch);
         AMQP.Queue.DeclareOk ok = ch.queueDeclare(q, false, false, true, null);
-        assertEquals(1, ok.getMessageCount());
+        assertThat(ok.getMessageCount()).isEqualTo(1);
         ch.queueDelete(q);
         ch.exchangeDelete(x);
     }
@@ -406,13 +399,10 @@ public class ConnectionRecovery extends BrokerTestCase {
         final AtomicReference<String> nameBefore = new AtomicReference<String>(q);
         final AtomicReference<String> nameAfter  = new AtomicReference<String>();
         final CountDownLatch listenerLatch = new CountDownLatch(1);
-        ((AutorecoveringConnection)connection).addQueueRecoveryListener(new QueueRecoveryListener() {
-            @Override
-            public void queueRecovered(String oldName, String newName) {
-                nameBefore.set(oldName);
-                nameAfter.set(newName);
-                listenerLatch.countDown();
-            }
+        ((AutorecoveringConnection)connection).addQueueRecoveryListener((oldName, newName) -> {
+            nameBefore.set(oldName);
+            nameAfter.set(newName);
+            listenerLatch.countDown();
         });
         ch.queueBind(nameBefore.get(), x, "");
         restartPrimaryAndWaitForRecovery();
@@ -422,7 +412,7 @@ public class ConnectionRecovery extends BrokerTestCase {
         ch.basicPublish(x, "", null, "msg".getBytes());
         waitForConfirms(ch);
         AMQP.Queue.DeclareOk ok = ch.queueDeclarePassive(nameAfter.get());
-        assertEquals(1, ok.getMessageCount());
+        assertThat(ok.getMessageCount()).isEqualTo(1);
         ch.queueDelete(nameAfter.get());
         ch.exchangeDelete(x);
     }
@@ -511,13 +501,10 @@ public class ConnectionRecovery extends BrokerTestCase {
         final AtomicReference<String> nameBefore = new AtomicReference<String>();
         final AtomicReference<String> nameAfter  = new AtomicReference<String>();
         final CountDownLatch listenerLatch = new CountDownLatch(1);
-        ((AutorecoveringConnection)connection).addQueueRecoveryListener(new QueueRecoveryListener() {
-            @Override
-            public void queueRecovered(String oldName, String newName) {
-                nameBefore.set(oldName);
-                nameAfter.set(newName);
-                listenerLatch.countDown();
-            }
+        ((AutorecoveringConnection)connection).addQueueRecoveryListener((oldName, newName) -> {
+            nameBefore.set(oldName);
+            nameAfter.set(newName);
+            listenerLatch.countDown();
         });
 
         closeAndWaitForRecovery();
@@ -525,7 +512,7 @@ public class ConnectionRecovery extends BrokerTestCase {
         expectChannelRecovery(channel);
         channel.basicPublish(x, "", null, "msg".getBytes());
         assertDelivered(q, 1);
-        assertFalse(nameBefore.get().equals(nameAfter.get()));
+        assertThat(nameBefore).doesNotHaveValue(nameAfter.get());
         channel.queueDelete(q);
     }
 
@@ -620,11 +607,11 @@ public class ConnectionRecovery extends BrokerTestCase {
         channel.queueDeclare(q, true, false, false, null);
         // now delete it using the delegate so AutorecoveringConnection and AutorecoveringChannel are not aware of it
         ((AutorecoveringChannel)channel).getDelegate().queueDelete(q);
-        assertNotNull(((AutorecoveringConnection)connection).getRecordedQueues().get(q));
+        assertThat(((AutorecoveringConnection)connection).getRecordedQueues().get(q)).isNotNull();
         // exclude the queue from recovery
         ((AutorecoveringConnection)connection).excludeQueueFromRecovery(q, true);
         // verify its not there
-        assertNull(((AutorecoveringConnection)connection).getRecordedQueues().get(q));
+        assertThat(((AutorecoveringConnection)connection).getRecordedQueues().get(q)).isNull();
         // reconnect
         closeAndWaitForRecovery();
         expectChannelRecovery(channel);
@@ -657,19 +644,17 @@ public class ConnectionRecovery extends BrokerTestCase {
         final AtomicReference<String> tagA = new AtomicReference<String>();
         final AtomicReference<String> tagB = new AtomicReference<String>();
         final CountDownLatch listenerLatch = new CountDownLatch(n);
-        ((AutorecoveringConnection)connection).addConsumerRecoveryListener(new ConsumerRecoveryListener() {
-            @Override
-            public void consumerRecovered(String oldConsumerTag, String newConsumerTag) {
+        ((AutorecoveringConnection)connection).addConsumerRecoveryListener(
+            (oldConsumerTag, newConsumerTag) -> {
                 tagA.set(oldConsumerTag);
                 tagB.set(newConsumerTag);
                 listenerLatch.countDown();
-            }
-        });
+            });
 
         assertConsumerCount(n, q);
         closeAndWaitForRecovery();
         wait(listenerLatch);
-        assertTrue(tagA.get().equals(tagB.get()));
+        assertThat(tagA.get().equals(tagB.get())).isTrue();
         expectChannelRecovery(channel);
         assertConsumerCount(n, q);
 
@@ -721,8 +706,8 @@ public class ConnectionRecovery extends BrokerTestCase {
         RecoverableChannel ch2 = (RecoverableChannel) connection.createChannel();
         ch2.addRecoveryListener(listener);
 
-        assertTrue(ch1.isOpen());
-        assertTrue(ch2.isOpen());
+        assertThat(ch1.isOpen()).isTrue();
+        assertThat(ch2.isOpen()).isTrue();
         closeAndWaitForRecovery();
         expectChannelRecovery(ch1);
         expectChannelRecovery(ch2);
@@ -777,23 +762,23 @@ public class ConnectionRecovery extends BrokerTestCase {
             Channel channel1 = connection.createChannel();
             Channel channel2 = connection.createChannel();
 
-            assertEquals(0, connectionConsumers.size());
+            assertThat(connectionConsumers).isEmpty();
 
             String queue = channel1.queueDeclare().getQueue();
 
-            channel1.basicConsume(queue, true, new HashMap<String, Object>(), new DefaultConsumer(channel1));
-            assertEquals(1, connectionConsumers.size());
-            channel1.basicConsume(queue, true, new HashMap<String, Object>(), new DefaultConsumer(channel1));
-            assertEquals(2, connectionConsumers.size());
+            channel1.basicConsume(queue, true, new HashMap<>(), new DefaultConsumer(channel1));
+            assertThat(connectionConsumers).hasSize(1);
+            channel1.basicConsume(queue, true, new HashMap<>(), new DefaultConsumer(channel1));
+            assertThat(connectionConsumers).hasSize(2);
 
-            channel2.basicConsume(queue, true, new HashMap<String, Object>(), new DefaultConsumer(channel2));
-            assertEquals(3, connectionConsumers.size());
+            channel2.basicConsume(queue, true, new HashMap<>(), new DefaultConsumer(channel2));
+            assertThat(connectionConsumers).hasSize(3);
 
             channel1.close();
-            assertEquals(3 - 2, connectionConsumers.size());
+            assertThat(connectionConsumers).hasSize(3 - 2);
 
             channel2.close();
-            assertEquals(0, connectionConsumers.size());
+            assertThat(connectionConsumers).isEmpty();
         } finally {
             connection.abort();
         }
@@ -802,11 +787,11 @@ public class ConnectionRecovery extends BrokerTestCase {
     @Test public void recoveryWithExponentialBackoffDelayHandler() throws Exception {
         ConnectionFactory connectionFactory = TestUtils.connectionFactory();
         connectionFactory.setRecoveryDelayHandler(new RecoveryDelayHandler.ExponentialBackoffDelayHandler());
-        Connection testConnection = connectionFactory.newConnection();
+        Connection testConnection = connectionFactory.newConnection(UUID.randomUUID().toString());
         try {
-            assertTrue(testConnection.isOpen());
+            assertThat(testConnection.isOpen()).isTrue();
             TestUtils.closeAndWaitForRecovery((RecoverableConnection) testConnection);
-            assertTrue(testConnection.isOpen());
+            assertThat(testConnection.isOpen()).isTrue();
         } finally {
             connection.close();
         }
@@ -814,13 +799,16 @@ public class ConnectionRecovery extends BrokerTestCase {
     
     @Test public void recoveryWithMultipleThreads() throws Exception {
         // test with 8 recovery threads
-        final ThreadPoolExecutor executor = new ThreadPoolExecutor(8, 8, 30, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
+        final ThreadPoolExecutor executor = new ThreadPoolExecutor(8, 8, 30, TimeUnit.SECONDS,
+            new LinkedBlockingQueue<>());
         executor.allowCoreThreadTimeOut(true);
         ConnectionFactory connectionFactory = buildConnectionFactoryWithRecoveryEnabled(false);
-        assertNull(connectionFactory.getTopologyRecoveryExecutor());
+        assertThat(connectionFactory.getTopologyRecoveryExecutor()).isNull();
         connectionFactory.setTopologyRecoveryExecutor(executor);
-        assertEquals(executor, connectionFactory.getTopologyRecoveryExecutor());
-        RecoverableConnection testConnection = (RecoverableConnection) connectionFactory.newConnection();
+        assertThat(connectionFactory.getTopologyRecoveryExecutor()).isEqualTo(executor);
+        RecoverableConnection testConnection = (RecoverableConnection) connectionFactory.newConnection(
+            UUID.randomUUID().toString()
+        );
         try {
             final List<Channel> channels = new ArrayList<Channel>();
             final List<String> exchanges = new ArrayList<String>();
@@ -864,7 +852,7 @@ public class ConnectionRecovery extends BrokerTestCase {
                 }
             }
             // verify all queues/consumers got it
-            assertTrue(latch.await(30, TimeUnit.SECONDS));
+            assertThat(latch.await(30, TimeUnit.SECONDS)).isTrue();
             
             // cleanup
             Channel cleanupChannel = testConnection.createChannel();
@@ -878,7 +866,7 @@ public class ConnectionRecovery extends BrokerTestCase {
     }
 
     private void assertConsumerCount(int exp, String q) throws IOException {
-        assertEquals(exp, channel.queueDeclarePassive(q).getConsumerCount());
+        assertThat(channel.queueDeclarePassive(q).getConsumerCount()).isEqualTo(exp);
     }
 
     private static AMQP.Queue.DeclareOk declareClientNamedQueue(Channel ch, String q) throws IOException {
@@ -906,11 +894,11 @@ public class ConnectionRecovery extends BrokerTestCase {
         ch.confirmSelect();
         ch.queuePurge(q);
         AMQP.Queue.DeclareOk ok1 = declareClientNamedQueue(ch, q);
-        assertEquals(0, ok1.getMessageCount());
+        assertThat(ok1.getMessageCount()).isEqualTo(0);
         ch.basicPublish("", q, null, "msg".getBytes());
         waitForConfirms(ch);
         AMQP.Queue.DeclareOk ok2 = declareClientNamedQueue(ch, q);
-        assertEquals(1, ok2.getMessageCount());
+        assertThat(ok2.getMessageCount()).isEqualTo(1);
     }
 
     private static void expectAutoDeleteQueueAndBindingRecovery(Channel ch, String x, String q) throws IOException, InterruptedException,
@@ -918,12 +906,12 @@ public class ConnectionRecovery extends BrokerTestCase {
         ch.confirmSelect();
         ch.queuePurge(q);
         AMQP.Queue.DeclareOk ok1 = declareClientNamedAutoDeleteQueue(ch, q);
-        assertEquals(0, ok1.getMessageCount());
+        assertThat(ok1.getMessageCount()).isEqualTo(0);
         ch.exchangeDeclare(x, "fanout");
         ch.basicPublish(x, "", null, "msg".getBytes());
         waitForConfirms(ch);
         AMQP.Queue.DeclareOk ok2 = declareClientNamedAutoDeleteQueue(ch, q);
-        assertEquals(1, ok2.getMessageCount());
+        assertThat(ok2.getMessageCount()).isEqualTo(1);
     }
 
     private static void expectExchangeRecovery(Channel ch, String x) throws IOException, InterruptedException, TimeoutException {
@@ -938,12 +926,7 @@ public class ConnectionRecovery extends BrokerTestCase {
 
     private static CountDownLatch prepareForShutdown(Connection conn) {
         final CountDownLatch latch = new CountDownLatch(1);
-        conn.addShutdownListener(new ShutdownListener() {
-            @Override
-            public void shutdownCompleted(ShutdownSignalException cause) {
-                latch.countDown();
-            }
-        });
+        conn.addShutdownListener(cause -> latch.countDown());
         return latch;
     }
 
@@ -964,7 +947,7 @@ public class ConnectionRecovery extends BrokerTestCase {
     }
 
     private static void expectChannelRecovery(Channel ch) {
-        assertTrue(ch.isOpen());
+        assertThat(ch.isOpen()).isTrue();
     }
 
     @Override
@@ -975,20 +958,20 @@ public class ConnectionRecovery extends BrokerTestCase {
     private static RecoverableConnection newRecoveringConnection(boolean disableTopologyRecovery)
             throws IOException, TimeoutException {
         ConnectionFactory cf = buildConnectionFactoryWithRecoveryEnabled(disableTopologyRecovery);
-        return (AutorecoveringConnection) cf.newConnection();
+        return (AutorecoveringConnection) cf.newConnection(UUID.randomUUID().toString());
     }
 
     private static RecoverableConnection newRecoveringConnection(Address[] addresses)
             throws IOException, TimeoutException {
         ConnectionFactory cf = buildConnectionFactoryWithRecoveryEnabled(false);
         // specifically use the Address[] overload
-        return (AutorecoveringConnection) cf.newConnection(addresses);
+        return (AutorecoveringConnection) cf.newConnection(addresses, UUID.randomUUID().toString());
     }
 
     private static RecoverableConnection newRecoveringConnection(boolean disableTopologyRecovery, List<Address> addresses)
             throws IOException, TimeoutException {
         ConnectionFactory cf = buildConnectionFactoryWithRecoveryEnabled(disableTopologyRecovery);
-        return (AutorecoveringConnection) cf.newConnection(addresses);
+        return (AutorecoveringConnection) cf.newConnection(addresses, UUID.randomUUID().toString());
     }
 
     private static RecoverableConnection newRecoveringConnection(List<Address> addresses)
@@ -1020,7 +1003,7 @@ public class ConnectionRecovery extends BrokerTestCase {
     private static void wait(CountDownLatch latch) throws InterruptedException {
         // we want to wait for recovery to complete for a reasonable amount of time
         // but still make recovery failures easy to notice in development environments
-        assertTrue(latch.await(90, TimeUnit.SECONDS));
+        assertThat(latch.await(90, TimeUnit.SECONDS)).isTrue();
     }
 
     private static void waitForConfirms(Channel ch) throws InterruptedException, TimeoutException {
@@ -1028,10 +1011,10 @@ public class ConnectionRecovery extends BrokerTestCase {
     }
 
     private static void assertRecordedQueues(Connection conn, int size) {
-        assertEquals(size, ((AutorecoveringConnection)conn).getRecordedQueues().size());
+        assertThat(((AutorecoveringConnection)conn).getRecordedQueues()).hasSize(size);
     }
 
     private static void assertRecordedExchanges(Connection conn, int size) {
-        assertEquals(size, ((AutorecoveringConnection)conn).getRecordedExchanges().size());
+        assertThat(((AutorecoveringConnection)conn).getRecordedExchanges()).hasSize(size);
     }
 }

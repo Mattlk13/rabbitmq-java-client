@@ -1,7 +1,7 @@
-// Copyright (c) 2017-2020 Pivotal Software, Inc.  All rights reserved.
+// Copyright (c) 2017-2020 VMware, Inc. or its affiliates.  All rights reserved.
 //
 // This software, the RabbitMQ Java client library, is triple-licensed under the
-// Mozilla Public License 1.1 ("MPL"), the GNU General Public License version 2
+// Mozilla Public License 2.0 ("MPL"), the GNU General Public License version 2
 // ("GPL") and the Apache License version 2 ("ASL"). For the MPL, please see
 // LICENSE-MPL-RabbitMQ. For the GPL, please see LICENSE-GPL2.  For the ASL,
 // please see LICENSE-APACHE2.
@@ -39,7 +39,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.awaitility.Awaitility.waitAtMost;
+import static com.rabbitmq.client.test.TestUtils.waitAtMost;
 import static org.junit.Assert.*;
 
 public class RpcTest {
@@ -217,7 +217,7 @@ public class RpcTest {
         cf.setNetworkRecoveryInterval(1000);
         Connection connection = null;
         try {
-            connection = cf.newConnection();
+            connection = cf.newConnection(UUID.randomUUID().toString());
             Channel channel = connection.createChannel();
             RpcClient client = new RpcClient(new RpcClientParams()
                     .channel(channel).exchange("").routingKey(queue).timeout(1000));
@@ -265,7 +265,7 @@ public class RpcTest {
         cf.setNetworkRecoveryInterval(1000);
         Connection connection = null;
         try {
-            connection = cf.newConnection();
+            connection = cf.newConnection(UUID.randomUUID().toString());
             Channel channel = connection.createChannel();
             RpcClient client = new RpcClient(new RpcClientParams()
                     .channel(channel).exchange("").routingKey(queue).timeout(1000));
@@ -320,7 +320,7 @@ public class RpcTest {
 
         serverThread.interrupt();
 
-        waitAtMost(Duration.ofSeconds(1)).until(() -> !serverThread.isAlive()) ;
+        waitAtMost(Duration.ofSeconds(1), () -> !serverThread.isAlive());
 
         client.close();
     }

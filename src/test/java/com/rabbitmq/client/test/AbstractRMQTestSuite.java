@@ -1,7 +1,7 @@
-// Copyright (c) 2007-Present Pivotal Software, Inc.  All rights reserved.
+// Copyright (c) 2007-2020 VMware, Inc. or its affiliates.  All rights reserved.
 //
 // This software, the RabbitMQ Java client library, is triple-licensed under the
-// Mozilla Public License 1.1 ("MPL"), the GNU General Public License version 2
+// Mozilla Public License 2.0 ("MPL"), the GNU General Public License version 2
 // ("GPL") and the Apache License version 2 ("ASL"). For the MPL, please see
 // LICENSE-MPL-RabbitMQ. For the GPL, please see LICENSE-GPL2.  For the ASL,
 // please see LICENSE-APACHE2.
@@ -43,35 +43,9 @@ public abstract class AbstractRMQTestSuite {
   }
 
   public static boolean requiredProperties() {
-    /* GNU Make. */
-    String make = Host.makeCommand();
-    boolean isGNUMake = false;
-    if (make != null) {
-      try {
-        Process makeProc = Host.executeCommandIgnoringErrors(make + " --version");
-        String makeVersion = Host.capture(makeProc.getInputStream());
-        isGNUMake = makeVersion.startsWith("GNU Make");
-      } catch (IOException e) {}
-    }
-    if (!isGNUMake) {
-      System.err.println(
-          "GNU Make required; please set \"make.bin\" system property" +
-          " or \"$MAKE\" environment variable");
-      return false;
-    }
-
-    /* Path to RabbitMQ. */
-    String rabbitmq = Host.rabbitmqDir();
-    if (rabbitmq == null || !new File(rabbitmq).isDirectory()) {
-      System.err.println(
-          "RabbitMQ required; please set \"rabbitmq.dir\" system" +
-          " property");
-      return false;
-    }
-
     /* Path to rabbitmqctl. */
     String rabbitmqctl = Host.rabbitmqctlCommand();
-    if (rabbitmqctl == null || !new File(rabbitmqctl).isFile()) {
+    if (rabbitmqctl == null) {
       System.err.println(
           "rabbitmqctl required; please set \"rabbitmqctl.bin\" system" +
           " property");

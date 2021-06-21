@@ -1,7 +1,7 @@
-// Copyright (c) 2018 Pivotal Software, Inc.  All rights reserved.
+// Copyright (c) 2018-2020 VMware, Inc. or its affiliates.  All rights reserved.
 //
 // This software, the RabbitMQ Java client library, is triple-licensed under the
-// Mozilla Public License 1.1 ("MPL"), the GNU General Public License version 2
+// Mozilla Public License 2.0 ("MPL"), the GNU General Public License version 2
 // ("GPL") and the Apache License version 2 ("ASL"). For the MPL, please see
 // LICENSE-MPL-RabbitMQ. For the GPL, please see LICENSE-GPL2.  For the ASL,
 // please see LICENSE-APACHE2.
@@ -30,19 +30,19 @@ import java.util.function.BiPredicate;
  */
 public class TopologyRecoveryRetryHandlerBuilder {
 
-    private BiPredicate<? super RecordedQueue, Exception> queueRecoveryRetryCondition = (q, e) -> false;
-    private BiPredicate<? super RecordedExchange, Exception> exchangeRecoveryRetryCondition = (ex, e) -> false;
-    private BiPredicate<? super RecordedBinding, Exception> bindingRecoveryRetryCondition = (b, e) -> false;
-    private BiPredicate<? super RecordedConsumer, Exception> consumerRecoveryRetryCondition = (c, e) -> false;
+    protected BiPredicate<? super RecordedQueue, Exception> queueRecoveryRetryCondition = (q, e) -> false;
+    protected BiPredicate<? super RecordedExchange, Exception> exchangeRecoveryRetryCondition = (ex, e) -> false;
+    protected BiPredicate<? super RecordedBinding, Exception> bindingRecoveryRetryCondition = (b, e) -> false;
+    protected BiPredicate<? super RecordedConsumer, Exception> consumerRecoveryRetryCondition = (c, e) -> false;
 
-    private DefaultRetryHandler.RetryOperation<?> queueRecoveryRetryOperation = context -> null;
-    private DefaultRetryHandler.RetryOperation<?> exchangeRecoveryRetryOperation = context -> null;
-    private DefaultRetryHandler.RetryOperation<?> bindingRecoveryRetryOperation = context -> null;
-    private DefaultRetryHandler.RetryOperation<?> consumerRecoveryRetryOperation = context -> null;
+    protected DefaultRetryHandler.RetryOperation<?> queueRecoveryRetryOperation = context -> null;
+    protected DefaultRetryHandler.RetryOperation<?> exchangeRecoveryRetryOperation = context -> null;
+    protected DefaultRetryHandler.RetryOperation<?> bindingRecoveryRetryOperation = context -> null;
+    protected DefaultRetryHandler.RetryOperation<?> consumerRecoveryRetryOperation = context -> null;
 
-    private int retryAttempts = 2;
+    protected int retryAttempts = 2;
 
-    private BackoffPolicy backoffPolicy = nbAttempts -> {
+    protected BackoffPolicy backoffPolicy = nbAttempts -> {
     };
 
     public static TopologyRecoveryRetryHandlerBuilder builder() {

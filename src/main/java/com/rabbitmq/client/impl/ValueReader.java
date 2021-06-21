@@ -1,7 +1,7 @@
-// Copyright (c) 2007-2020 Pivotal Software, Inc.  All rights reserved.
+// Copyright (c) 2007-2020 VMware, Inc. or its affiliates.  All rights reserved.
 //
 // This software, the RabbitMQ Java client library, is triple-licensed under the
-// Mozilla Public License 1.1 ("MPL"), the GNU General Public License version 2
+// Mozilla Public License 2.0 ("MPL"), the GNU General Public License version 2
 // ("GPL") and the Apache License version 2 ("ASL"). For the MPL, please see
 // LICENSE-MPL-RabbitMQ. For the GPL, please see LICENSE-GPL2.  For the ASL,
 // please see LICENSE-APACHE2.
@@ -17,6 +17,7 @@
 package com.rabbitmq.client.impl;
 
 import java.io.DataInputStream;
+import java.io.EOFException;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -164,6 +165,9 @@ public class ValueReader
           case 'I':
               value = in.readInt();
               break;
+          case 'i':
+              value = readUnsignedInt(in);
+              break;
           case 'D':
               int scale = in.readUnsignedByte();
               byte [] unscaled = new byte[4];
@@ -194,6 +198,9 @@ public class ValueReader
           case 's':
               value = in.readShort();
               break;
+          case 'u':
+              value = in.readUnsignedShort();
+              break;
           case 't':
               value = in.readBoolean();
               break;
@@ -208,6 +215,19 @@ public class ValueReader
                   ("Unrecognised type in table");
         }
         return value;
+    }
+
+    /** Read an unsigned int */
+    private static long readUnsignedInt(DataInputStream in) 
+        throws IOException 
+    {
+        long ch1 = in.read();
+        long ch2 = in.read();
+        long ch3 = in.read();
+        long ch4 = in.read();
+        if ((ch1 | ch2 | ch3 | ch4) < 0)
+            throw new EOFException();
+        return ((ch1 << 24) + (ch2 << 16) + (ch3 << 8) + ch4);
     }
 
     /** Read a field-array */

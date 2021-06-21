@@ -1,7 +1,7 @@
-// Copyright (c) 2007-Present Pivotal Software, Inc.  All rights reserved.
+// Copyright (c) 2007-2020 VMware, Inc. or its affiliates.  All rights reserved.
 //
 // This software, the RabbitMQ Java client library, is triple-licensed under the
-// Mozilla Public License 1.1 ("MPL"), the GNU General Public License version 2
+// Mozilla Public License 2.0 ("MPL"), the GNU General Public License version 2
 // ("GPL") and the Apache License version 2 ("ASL"). For the MPL, please see
 // LICENSE-MPL-RabbitMQ. For the GPL, please see LICENSE-GPL2.  For the ASL,
 // please see LICENSE-APACHE2.
@@ -55,7 +55,8 @@ public class RecoveryAwareAMQConnectionFactory {
     // package protected API, made public for testing only
     public RecoveryAwareAMQConnection newConnection() throws IOException, TimeoutException {
         Exception lastException = null;
-        List<Address> shuffled = shuffle(addressResolver.getAddresses());
+        List<Address> resolved = addressResolver.getAddresses();
+        List<Address> shuffled = addressResolver.maybeShuffle(resolved);
 
         for (Address addr : shuffled) {
             try {
@@ -79,12 +80,6 @@ public class RecoveryAwareAMQConnectionFactory {
             }
         }
         throw new IOException("failed to connect");
-    }
-
-    private static List<Address> shuffle(List<Address> addrs) {
-        List<Address> list = new ArrayList<Address>(addrs);
-        Collections.shuffle(list);
-        return list;
     }
 
     protected RecoveryAwareAMQConnection createConnection(ConnectionParams params, FrameHandler handler, MetricsCollector metricsCollector) {

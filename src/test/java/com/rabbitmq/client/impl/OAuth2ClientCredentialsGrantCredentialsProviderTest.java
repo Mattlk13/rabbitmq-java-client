@@ -1,7 +1,7 @@
-// Copyright (c) 2019 Pivotal Software, Inc.  All rights reserved.
+// Copyright (c) 2019-2020 VMware, Inc. or its affiliates.  All rights reserved.
 //
 // This software, the RabbitMQ Java client library, is triple-licensed under the
-// Mozilla Public License 1.1 ("MPL"), the GNU General Public License version 2
+// Mozilla Public License 2.0 ("MPL"), the GNU General Public License version 2
 // ("GPL") and the Apache License version 2 ("ASL"). For the MPL, please see
 // LICENSE-MPL-RabbitMQ. For the GPL, please see LICENSE-GPL2.  For the ASL,
 // please see LICENSE-APACHE2.
@@ -28,6 +28,7 @@ import org.eclipse.jetty.server.handler.AbstractHandler;
 import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 
 import javax.net.ssl.SSLContext;
@@ -56,8 +57,24 @@ public class OAuth2ClientCredentialsGrantCredentialsProviderTest {
 
     Server server;
 
+    static boolean isJava13() {
+        String javaVersion = System.getProperty("java.version");
+        return javaVersion != null && javaVersion.startsWith("13.");
+    }
+
+    @Before
+    public void init() {
+        if (isJava13()) {
+            // for Java 13.0.7, see https://github.com/bcgit/bc-java/issues/941
+            System.setProperty("keystore.pkcs12.keyProtectionAlgorithm", "PBEWithHmacSHA256AndAES_256");
+        }
+    }
+
     @After
     public void tearDown() throws Exception {
+        if (isJava13()) {
+            System.setProperty("keystore.pkcs12.keyProtectionAlgorithm", "");
+        }
         if (server != null) {
             server.stop();
         }

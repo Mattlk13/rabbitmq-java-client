@@ -1,7 +1,7 @@
-// Copyright (c) 2007-Present Pivotal Software, Inc.  All rights reserved.
+// Copyright (c) 2007-2020 VMware, Inc. or its affiliates.  All rights reserved.
 //
 // This software, the RabbitMQ Java client library, is triple-licensed under the
-// Mozilla Public License 1.1 ("MPL"), the GNU General Public License version 2
+// Mozilla Public License 2.0 ("MPL"), the GNU General Public License version 2
 // ("GPL") and the Apache License version 2 ("ASL"). For the MPL, please see
 // LICENSE-MPL-RabbitMQ. For the GPL, please see LICENSE-GPL2.  For the ASL,
 // please see LICENSE-APACHE2.
@@ -17,6 +17,8 @@ package com.rabbitmq.client.impl.recovery;
 
 import com.rabbitmq.client.*;
 import com.rabbitmq.client.impl.AMQCommand;
+import com.rabbitmq.client.impl.recovery.Utils.IoTimeoutExceptionRunnable;
+import com.rabbitmq.utility.Utility;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,11 +40,11 @@ public class AutorecoveringChannel implements RecoverableChannel {
 
     private volatile RecoveryAwareChannelN delegate;
     private volatile AutorecoveringConnection connection;
-    private final List<ShutdownListener> shutdownHooks  = new CopyOnWriteArrayList<ShutdownListener>();
-    private final List<RecoveryListener> recoveryListeners = new CopyOnWriteArrayList<RecoveryListener>();
-    private final List<ReturnListener> returnListeners = new CopyOnWriteArrayList<ReturnListener>();
-    private final List<ConfirmListener> confirmListeners = new CopyOnWriteArrayList<ConfirmListener>();
-    private final Set<String> consumerTags = Collections.synchronizedSet(new HashSet<String>());
+    private final List<ShutdownListener> shutdownHooks  = new CopyOnWriteArrayList<>();
+    private final List<RecoveryListener> recoveryListeners = new CopyOnWriteArrayList<>();
+    private final List<ReturnListener> returnListeners = new CopyOnWriteArrayList<>();
+    private final List<ConfirmListener> confirmListeners = new CopyOnWriteArrayList<>();
+    private final Set<String> consumerTags = Collections.synchronizedSet(new HashSet<>());
     private int prefetchCountConsumer;
     private int prefetchCountGlobal;
     private boolean usesPublisherConfirms;
@@ -69,33 +71,41 @@ public class AutorecoveringChannel implements RecoverableChannel {
 
     @Override
     public void close() throws IOException, TimeoutException {
-        try {
-            delegate.close();
-        } finally {
-            for (String consumerTag : consumerTags) {
-                this.connection.deleteRecordedConsumer(consumerTag);
-            }
-            this.connection.unregisterChannel(this);
-        }
+        executeAndClean(() -> delegate.close());
     }
 
     @Override
     public void close(int closeCode, String closeMessage) throws IOException, TimeoutException {
-        try {
-          delegate.close(closeCode, closeMessage);
-        } finally {
-          this.connection.unregisterChannel(this);
-        }
+        executeAndClean(() -> delegate.close(closeCode, closeMessage));
     }
 
     @Override
     public void abort() throws IOException {
-        delegate.abort();
+        try {
+            executeAndClean(() -> delegate.abort());
+        } catch (TimeoutException e) {
+            // abort() ignores exceptions
+        }
     }
 
     @Override
     public void abort(int closeCode, String closeMessage) throws IOException {
-        delegate.abort(closeCode, closeMessage);
+        try {
+            executeAndClean(() -> delegate.abort(closeCode, closeMessage));
+        } catch (TimeoutException e) {
+            // abort() ignores exceptions
+        }
+    }
+
+    private void executeAndClean(IoTimeoutExceptionRunnable callback) throws IOException, TimeoutException {
+        try {
+            callback.run();
+        } finally {
+            for (String consumerTag : Utility.copy(consumerTags)) {
+                this.deleteRecordedConsumer(consumerTag);
+            }
+            this.connection.unregisterChannel(this);
+        }
     }
 
     @Override
@@ -635,10 +645,7 @@ public class AutorecoveringChannel implements RecoverableChannel {
 
     @Override
     public void basicCancel(String consumerTag) throws IOException {
-        RecordedConsumer c = this.deleteRecordedConsumer(consumerTag);
-        if(c != null) {
-            this.maybeDeleteRecordedAutoDeleteQueue(c.getQueue());
-        }
+        this.deleteRecordedConsumer(consumerTag);
         delegate.basicCancel(consumerTag);
     }
 
@@ -893,13 +900,16 @@ public class AutorecoveringChannel implements RecoverableChannel {
         this.connection.recordConsumer(result, consumer);
     }
 
-    private RecordedConsumer deleteRecordedConsumer(String consumerTag) {
+    /**
+     * Delete the recorded consumer from this channel and accompanying connection
+     * @param consumerTag consumer tag to delete
+     */
+    public void deleteRecordedConsumer(String consumerTag) {
         this.consumerTags.remove(consumerTag);
-        return this.connection.deleteRecordedConsumer(consumerTag);
-    }
-
-    private void maybeDeleteRecordedAutoDeleteQueue(String queue) {
-        this.connection.maybeDeleteRecordedAutoDeleteQueue(queue);
+        RecordedConsumer c = this.connection.deleteRecordedConsumer(consumerTag);
+        if (c != null) {
+            this.connection.maybeDeleteRecordedAutoDeleteQueue(c.getQueue());
+        }
     }
 
     private void maybeDeleteRecordedAutoDeleteExchange(String exchange) {

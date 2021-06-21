@@ -1,7 +1,7 @@
-// Copyright (c) 2007-2020 Pivotal Software, Inc.  All rights reserved.
+// Copyright (c) 2007-2020 VMware, Inc. or its affiliates.  All rights reserved.
 //
 // This software, the RabbitMQ Java client library, is triple-licensed under the
-// Mozilla Public License 1.1 ("MPL"), the GNU General Public License version 2
+// Mozilla Public License 2.0 ("MPL"), the GNU General Public License version 2
 // ("GPL") and the Apache License version 2 ("ASL"). For the MPL, please see
 // LICENSE-MPL-RabbitMQ. For the GPL, please see LICENSE-GPL2.  For the ASL,
 // please see LICENSE-APACHE2.
@@ -15,13 +15,12 @@
 
 package com.rabbitmq.client.impl;
 
-import com.rabbitmq.client.*;
 import com.rabbitmq.client.Method;
+import com.rabbitmq.client.*;
 import com.rabbitmq.client.impl.AMQChannel.BlockingRpcContinuation;
 import com.rabbitmq.client.impl.recovery.RecoveryCanBeginListener;
 import com.rabbitmq.utility.BlockingCell;
 import com.rabbitmq.utility.Utility;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,7 +34,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 final class Copyright {
-    final static String COPYRIGHT="Copyright (c) 2007-2020 Pivotal Software, Inc.";
+    final static String COPYRIGHT="Copyright (c) 2007-2021 VMware, Inc. or its affiliates.";
     final static String LICENSE="Licensed under the MPL. See https://www.rabbitmq.com/";
 }
 
@@ -46,6 +45,8 @@ final class Copyright {
  * for an example.
  */
 public class AMQConnection extends ShutdownNotifierComponent implements Connection, NetworkConnection {
+
+    private static final int MAX_UNSIGNED_SHORT = 65535;
 
     private static final Logger LOGGER = LoggerFactory.getLogger(AMQConnection.class);
     // we want socket write and channel shutdown timeouts to kick in after
@@ -399,6 +400,11 @@ public class AMQConnection extends ShutdownNotifierComponent implements Connecti
             int channelMax =
                 negotiateChannelMax(this.requestedChannelMax,
                                     connTune.getChannelMax());
+
+            if (!checkUnsignedShort(channelMax)) {
+                throw new IllegalArgumentException("Negotiated channel max must be between 0 and " + MAX_UNSIGNED_SHORT + ": " + channelMax);
+            }
+
             _channelManager = instantiateChannelManager(channelMax, threadFactory);
 
             int frameMax =
@@ -409,6 +415,10 @@ public class AMQConnection extends ShutdownNotifierComponent implements Connecti
             int heartbeat =
                 negotiatedMaxValue(this.requestedHeartbeat,
                                    connTune.getHeartbeat());
+
+            if (!checkUnsignedShort(heartbeat)) {
+                throw new IllegalArgumentException("Negotiated heartbeat must be between 0 and " + MAX_UNSIGNED_SHORT + ": " + heartbeat);
+            }
 
             setHeartbeat(heartbeat);
 
@@ -624,6 +634,10 @@ public class AMQConnection extends ShutdownNotifierComponent implements Connecti
         return (clientValue == 0 || serverValue == 0) ?
             Math.max(clientValue, serverValue) :
             Math.min(clientValue, serverValue);
+    }
+
+    private static boolean checkUnsignedShort(int value) {
+        return value >= 0 && value <= MAX_UNSIGNED_SHORT;
     }
 
     private class MainLoop implements Runnable {

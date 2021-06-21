@@ -1,7 +1,7 @@
-// Copyright (c) 2018-Present Pivotal Software, Inc.  All rights reserved.
+// Copyright (c) 2018-2020 VMware, Inc. or its affiliates.  All rights reserved.
 //
 // This software, the RabbitMQ Java client library, is triple-licensed under the
-// Mozilla Public License 1.1 ("MPL"), the GNU General Public License version 2
+// Mozilla Public License 2.0 ("MPL"), the GNU General Public License version 2
 // ("GPL") and the Apache License version 2 ("ASL"). For the MPL, please see
 // LICENSE-MPL-RabbitMQ. For the GPL, please see LICENSE-GPL2.  For the ASL,
 // please see LICENSE-APACHE2.
@@ -18,13 +18,9 @@ package com.rabbitmq.client.test;
 import com.rabbitmq.client.impl.MicrometerMetricsCollector;
 import io.micrometer.core.instrument.Meter;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.assertj.core.api.Assertions;
 import org.junit.Before;
 import org.junit.Test;
-
-import java.util.Iterator;
-
-import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertThat;
 
 /**
  *
@@ -44,7 +40,7 @@ public class MicrometerMetricsCollectorTest {
     public void noTag() {
         collector = new MicrometerMetricsCollector(registry, "rabbitmq");
         for (Meter meter : registry.getMeters()) {
-            assertThat(size(meter.getId().getTags()), is(0));
+            Assertions.assertThat(meter.getId().getTags()).isEmpty();
         }
     }
 
@@ -52,20 +48,13 @@ public class MicrometerMetricsCollectorTest {
     public void tags() {
         collector = new MicrometerMetricsCollector(registry, "rabbitmq", "uri", "/api/users");
         for (Meter meter : registry.getMeters()) {
-            assertThat(size(meter.getId().getTags()), is(1));
+            Assertions.assertThat(meter.getId().getTags()).hasSize(1);
         }
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void tagsMustBeKeyValuePairs() {
         collector = new MicrometerMetricsCollector(registry, "rabbitmq", "uri");
-    }
-
-    static int size(Iterable<?> iterable) {
-        Iterator<?> iterator = iterable.iterator();
-        int i = 0;
-        for ( ; iterator.hasNext() ; ++i ) iterator.next();
-        return i;
     }
 
 }

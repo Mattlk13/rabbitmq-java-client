@@ -1,7 +1,7 @@
-// Copyright (c) 2007-Present Pivotal Software, Inc.  All rights reserved.
+// Copyright (c) 2007-2020 VMware, Inc. or its affiliates.  All rights reserved.
 //
 // This software, the RabbitMQ Java client library, is triple-licensed under the
-// Mozilla Public License 1.1 ("MPL"), the GNU General Public License version 2
+// Mozilla Public License 2.0 ("MPL"), the GNU General Public License version 2
 // ("GPL") and the Apache License version 2 ("ASL"). For the MPL, please see
 // LICENSE-MPL-RabbitMQ. For the GPL, please see LICENSE-GPL2.  For the ASL,
 // please see LICENSE-APACHE2.
@@ -19,25 +19,53 @@ package com.rabbitmq.client.test.functional;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
+import com.rabbitmq.client.Channel;
+import com.rabbitmq.client.test.TestUtils;
+import com.rabbitmq.client.test.TestUtils.CallableFunction;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
+import java.util.UUID;
 import org.junit.Test;
 
 import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.QueueingConsumer;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
+@RunWith(Parameterized.class)
 public class Nack extends AbstractRejectTest {
 
+    @Parameterized.Parameters
+    public static Object[] queueCreators() {
+        return new Object[] {
+            (CallableFunction<Channel, String>) channel -> {
+                String q = UUID.randomUUID().toString();
+                channel.queueDeclare(q, true, false, false, Collections.singletonMap("x-queue-type", "quorum"));
+                return q;
+            },
+            (CallableFunction<Channel, String>) channel -> {
+                String q = UUID.randomUUID().toString();
+                channel.queueDeclare(q, true, false, false, Collections.singletonMap("x-queue-type", "classic"));
+                return q;
+            }};
+        }
+
+    @Parameterized.Parameter public TestUtils.CallableFunction<Channel, String> queueCreator;
+
     @Test public void singleNack() throws Exception {
-        String q =
-            channel.queueDeclare("", false, true, false, null).getQueue();
+        String q = queueCreator.apply(channel);
 
         byte[] m1 = "1".getBytes();
         byte[] m2 = "2".getBytes();
 
+        channel.confirmSelect();
+
         basicPublishVolatile(m1, q);
         basicPublishVolatile(m2, q);
+
+        channel.waitForConfirmsOrDie(1000);
 
         long tag1 = checkDelivery(channel.basicGet(q, false), m1, false);
         long tag2 = checkDelivery(channel.basicGet(q, false), m2, false);
@@ -62,18 +90,21 @@ public class Nack extends AbstractRejectTest {
     }
 
     @Test public void multiNack() throws Exception {
-        String q =
-            channel.queueDeclare("", false, true, false, null).getQueue();
+        String q = queueCreator.apply(channel);
 
         byte[] m1 = "1".getBytes();
         byte[] m2 = "2".getBytes();
         byte[] m3 = "3".getBytes();
         byte[] m4 = "4".getBytes();
 
+        channel.confirmSelect();
+
         basicPublishVolatile(m1, q);
         basicPublishVolatile(m2, q);
         basicPublishVolatile(m3, q);
         basicPublishVolatile(m4, q);
+
+        channel.waitForConfirmsOrDie(1000);
 
         checkDelivery(channel.basicGet(q, false), m1, false);
         long tag1 = checkDelivery(channel.basicGet(q, false), m2, false);
@@ -104,14 +135,17 @@ public class Nack extends AbstractRejectTest {
     }
 
     @Test public void nackAll() throws Exception {
-        String q =
-            channel.queueDeclare("", false, true, false, null).getQueue();
+        String q = queueCreator.apply(channel);
 
         byte[] m1 = "1".getBytes();
         byte[] m2 = "2".getBytes();
 
+        channel.confirmSelect();
+
         basicPublishVolatile(m1, q);
         basicPublishVolatile(m2, q);
+
+        channel.waitForConfirmsOrDie(1000);
 
         checkDelivery(channel.basicGet(q, false), m1, false);
         checkDelivery(channel.basicGet(q, false), m2, false);

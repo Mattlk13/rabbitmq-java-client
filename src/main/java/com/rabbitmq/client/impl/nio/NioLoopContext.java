@@ -1,7 +1,7 @@
-// Copyright (c) 2007-Present Pivotal Software, Inc.  All rights reserved.
+// Copyright (c) 2007-2020 VMware, Inc. or its affiliates.  All rights reserved.
 //
 // This software, the RabbitMQ Java client library, is triple-licensed under the
-// Mozilla Public License 1.1 ("MPL"), the GNU General Public License version 2
+// Mozilla Public License 2.0 ("MPL"), the GNU General Public License version 2
 // ("GPL") and the Apache License version 2 ("ASL"). For the MPL, please see
 // LICENSE-MPL-RabbitMQ. For the GPL, please see LICENSE-GPL2.  For the ASL,
 // please see LICENSE-APACHE2.
@@ -54,12 +54,19 @@ public class NioLoopContext {
     }
 
     void initStateIfNecessary() throws IOException {
-        // FIXME this should be synchronized
-        if (this.readSelectorState == null) {
-            this.readSelectorState = new SelectorHolder(Selector.open());
-            this.writeSelectorState = new SelectorHolder(Selector.open());
+        // This code is supposed to be called only from the SocketChannelFrameHandlerFactory
+        // and while holding the lock.
+        // We lock just in case some other code calls this method in the future.
+        socketChannelFrameHandlerFactory.lock();
+        try {
+            if (this.readSelectorState == null) {
+                this.readSelectorState = new SelectorHolder(Selector.open());
+                this.writeSelectorState = new SelectorHolder(Selector.open());
 
-            startIoLoops();
+                startIoLoops();
+            }
+        } finally {
+            socketChannelFrameHandlerFactory.unlock();
         }
     }
 

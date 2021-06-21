@@ -1,7 +1,7 @@
-// Copyright (c) 2007-Present Pivotal Software, Inc.  All rights reserved.
+// Copyright (c) 2007-2020 VMware, Inc. or its affiliates.  All rights reserved.
 //
 // This software, the RabbitMQ Java client library, is triple-licensed under the
-// Mozilla Public License 1.1 ("MPL"), the GNU General Public License version 2
+// Mozilla Public License 2.0 ("MPL"), the GNU General Public License version 2
 // ("GPL") and the Apache License version 2 ("ASL"). For the MPL, please see
 // LICENSE-MPL-RabbitMQ. For the GPL, please see LICENSE-GPL2.  For the ASL,
 // please see LICENSE-APACHE2.
@@ -33,7 +33,7 @@ import java.net.ConnectException;
 public class ForgivingExceptionHandler implements ExceptionHandler {
     @Override
     public void handleUnexpectedConnectionDriverException(Connection conn, Throwable exception) {
-        log("An unexpected connection driver error occured", exception);
+        log("An unexpected connection driver error occurred", exception);
     }
 
     @Override
